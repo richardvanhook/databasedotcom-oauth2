@@ -1,9 +1,13 @@
+require "sinatra/base"
+
 module Salesforce
   module OAuth2
-    class WebServerFlowDemoApp
-      def call(env)
+    
+    class WebServerFlowDemoApp < Sinatra::Base
+      get '/*' do
         [200, {"Content-Type" => "text/plain"}, ["Ola!"]]
       end
     end
+    
   end
 end

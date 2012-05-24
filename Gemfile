@@ -2,7 +2,7 @@ source "http://rubygems.org"
 gem "rack-ssl"
 gem "thin"
 gem "oauth2"
-#gem "sinatra"
+gem "sinatra"
 
 group :development do
   gem "wirble"
