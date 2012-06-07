@@ -6,7 +6,6 @@ GEM
     databasedotcom (1.3.0)
       json
       multipart-post (~> 1.1)
-    encrypted_cookie (0.0.4)
     eventmachine (0.12.10)
     excon (0.14.0)
     faraday (0.8.1)
@@ -56,8 +55,8 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
+  addressable
   databasedotcom
-  encrypted_cookie
   haml
   heroku
   oauth2

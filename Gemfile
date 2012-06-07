@@ -1,9 +1,9 @@
 source "http://rubygems.org"
-gem "rack-ssl"
-gem "encrypted_cookie"
 gem "thin"
-gem "oauth2"
+gem "rack-ssl"
 gem "sinatra"
+gem "oauth2"
+gem "addressable"
 gem "databasedotcom"
 gem "haml"
 
