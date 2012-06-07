@@ -1,0 +1,49 @@
+.profile-pic {
+	margin-right: 12px;
+	align: left;
+}
+.ui-li-heading { white-space: normal;}
+
+span.error_message { color:red; font-size:16px; font-weight:400; line-height:1.4; margin-top:.5em; width:100%; float:none; display:block; }  
+
+abbr { color:red; font-weight:700; padding-right:.25em; }  
+
+@media screen and orientation portrait { span.error_message { margin-left:0 } }  
+
+@media screen and orientation landscape { span.error_message { margin-left:22%; } }
+
+div#terms{ 
+	overflow: auto; 
+	overflow-y: scroll;
+	height : 160px; 
+}
+
+/* PROGRESS BAR */
+.ui-progressbar {
+	height: 1em;
+}
+h3#poll-header{
+	margin: 0;
+}
+div .progress-item {
+	margin: 3px 0 3px 0;
+	padding: 0;
+}
+div .poll-subtext{
+	font-size: .6em; 
+	color: #808080;
+	margin: 2px 0 0 0;
+}
+
+a#terms-link{
+	margin: 0 0 10px 0;
+	float: right;
+	font-size: .8em;
+}
+
+div .ui-body-message{
+	margin: 0 5px;
+}
+div .ui-body-message p{
+	margin: 0;
+}

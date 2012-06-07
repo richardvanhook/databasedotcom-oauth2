@@ -1,0 +1,5 @@
+%div{:class=>"content-primary"}
+  %h2 Objects in org #{userinfo['organization_id']}
+  %ul{:"data-role" => "listview", :"data-inset"=>"true"}
+    - client.list_sobjects.each do |sobject_name|
+      %li #{sobject_name}
