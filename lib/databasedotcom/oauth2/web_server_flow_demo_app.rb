@@ -1,4 +1,5 @@
 require "sinatra/base"
+require "rack/ssl" unless ENV['RACK_ENV'] == "development"
 require "base64"
 require "databasedotcom"
 require "haml"
@@ -33,6 +34,7 @@ module Databasedotcom
       # $ ruby -ropenssl -rbase64 -e "puts Base64.strict_encode64(OpenSSL::Random.random_bytes(16).to_str)"
       token_encryption_key = Base64.strict_decode64(ENV['COOKIE_SECRET'])
 
+      use Rack::SSL unless ENV['RACK_ENV'] == "development"
       use Rack::Session::Cookie
       use Databasedotcom::OAuth2::WebServerFlow, 
         :endpoints            => endpoints, 
