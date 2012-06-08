@@ -1,49 +1,23 @@
 require "oauth2"
 require "addressable/uri"
 require "databasedotcom"
+require "cgi"
+require "base64"
+require "openssl"
 
 module Databasedotcom
   
-  class Client
-    
-    def self.from_token(token)
-      client = nil
-      unless token.nil?
-        client = self.new({
-          :client_id     => token.client.id, 
-          :client_secret => token.client.secret, 
-          :host          => token.client.site
-        })
-        m = token["id"].match(/\/id\/([^\/]+)\/([^\/]+)$/)
-        org_id        = m[1] rescue nil
-        user_id       = m[2] rescue nil
-        client.set_org_and_user_id(org_id,user_id)
-        client.version       = "23.0"
-        client.instance_url  = token.client.site
-        client.oauth_token   = token.token
-        client.refresh_token = token.refresh_token
-      end
-      client
-    end
-    
-    def set_org_and_user_id(orgid, userid)
-      @org_id        = orgid
-      @user_id       = userid
-    end
-
-  end
-
   module OAuth2
     
     class WebServerFlow
 
-      SESSION_CREDS_KEY  = "databasedotcom.credentials"
-      SESSION_CLIENT_KEY = "databasedotcom.client"
+      TOKEN_KEY  = "databasedotcom.token"
+      CLIENT_KEY = "databasedotcom.client"
       
       def initialize(app, options = nil)
         @app = app       
         unless options.nil?
-          @endpoints            = WebServerFlow.sanitize_endpoints(options[:endpoints])
+          @endpoints            = self.class.sanitize_endpoints(options[:endpoints])
           @token_encryption_key = options[:token_encryption_key]
         end
 
@@ -71,7 +45,7 @@ module Databasedotcom
         @env = env
         return authorize_call if on_authorize_path?
         return callback_call  if on_callback_path?
-        parse_access_code_from_session_if_present
+        materialize_token_and_client_from_session_if_present
         @app.call(env)
       end
 
@@ -82,24 +56,33 @@ module Databasedotcom
       end
 
       def authorize_call
-        endpoint = request.params["endpoint"]
-        keys = @endpoints[endpoint] #if endpoint not found, default will be used
-        endpoint = @endpoints.invert[keys]
-        mydomain = WebServerFlow.parse_domain(request.params["mydomain"])
+        #determine endpoint via param; but if blank, use default
+        endpoint = request.params["endpoint"] #get endpoint from http param
+        keys     = @endpoints[endpoint]       #if endpoint not found, default will be used
+        endpoint = @endpoints.invert[keys]    #re-lookup endpoint in case original param was bogus
+
+        #check if my domain is present and add .my.salesforce.com
+        mydomain = self.class.parse_domain(request.params["mydomain"])
+        mydomain = nil unless mydomain.nil? || !mydomain.strip.empty?
+        mydomain = mydomain.split(/\./).first + ".my.salesforce.com" unless mydomain.nil?
+
+        #add endpoint to relay state so callback knows which keys to use
         state = Addressable::URI.parse(request.params["state"] || "/")
         state.query_values={} unless state.query_values
-        state.query_values= state.query_values.merge({:endpoint => endpoint, :mydomain => mydomain})
+        state.query_values= state.query_values.merge({:endpoint => endpoint})
+        
+        #build params hash to be passed to ouath2 authorize redirect url
         auth_params = {
-          :redirect_uri  => "#{ENV['ORIGIN']}/auth/salesforce/callback",
-          :display       => "touch",
-          :immediate     => false,
-          :scope         => "id api refresh_token",
+          :redirect_uri  => "#{full_host}/auth/salesforce/callback",
           :state         => state.to_s
         }
-        redirect oauth2_client(mydomain.nil? ? endpoint : mydomain, 
-          keys[:key], 
-          keys[:secret] \
-        ).auth_code.authorize_url(auth_params)
+        scope = (self.class.param_repeated(request.url, :scope) || []).join(" ")
+        auth_params[:scope]     = scope                       unless scope.nil? || scope.strip.empty?
+        auth_params[:display]   = request.params["display"]   unless request.params["display"].nil?
+        auth_params[:immediate] = request.params["immediate"] unless request.params["immediate"].nil?
+
+        #do redirect
+        redirect client(mydomain || endpoint, keys[:key], keys[:secret]).auth_code.authorize_url(auth_params)
       end
       
       def on_callback_path?
@@ -107,58 +90,47 @@ module Databasedotcom
       end
 
       def callback_call
+        #grab authorization code
+        code = request.params["code"]
+        
+        #grab and remove endpoint from relay state
+        #upon successful retrieval of token, state is url where user will be redirected to
         state = Addressable::URI.parse(request.params["state"] || "/")
-        #puts "state1: #{state}"
         state.query_values= {} if state.query_values.nil?
         state_params = state.query_values.dup
         endpoint = state_params.delete("endpoint")
-        fail "endpoint param cannot blank" if endpoint.nil?
         keys = @endpoints[endpoint]
-        fail "endpoint #{endpoint} not found" if keys.nil?
-        code = request.params["code"]
-        #puts "code: #{code}"
-        mydomain = state_params.delete("mydomain")
         state.query_values= state_params
-        #puts "endpoint: #{endpoint}"
-        #puts "mydomain: #{mydomain}"
-        #puts "state2: #{state}"
-        #puts "state.query_values: #{state.query_values}"
 
-        oauth2_client = ::OAuth2::Client.new(
-           keys[:key], keys[:secret], :site => "https://#{mydomain.nil? || mydomain.empty? ? endpoint : mydomain}",
-           :authorize_url => '/services/oauth2/authorize',
-           :token_url     => '/services/oauth2/token'
-        )
-        access_token = oauth2_client.auth_code.get_token(code, :redirect_uri => "#{ENV['ORIGIN']}/auth/salesforce/callback")
+        #do callout to retrieve token
+        access_token = client(endpoint, keys[:key], keys[:secret]).auth_code.get_token(code, 
+          :redirect_uri => "#{full_host}/auth/salesforce/callback")
         access_token.options[:mode] = :query
         access_token.options[:param_name] = :oauth_token
-        @env["rack.session"] ||= {}
-        @env["rack.session"][SESSION_CREDS_KEY] = access_token.to_hash.merge({:endpoint => endpoint})
-        #puts "###callback rack.session #{@env["rack.session"]}"
-        puts "redirecting to #{state.to_str}..."
+        
+        #populate session with serialized, encrypted token
+        #will be used later to materialize actual token and databasedotcom client handle
+        @env["rack.session"] ||= {} #in case session is nil
+        @env["rack.session"][TOKEN_KEY] = self.class.encrypt(@token_encryption_key, access_token.to_hash.merge({:endpoint => endpoint}))
         redirect state.to_str
       end
 
-      def parse_access_code_from_session_if_present
-        access_token_hash = (@env["rack.session"] || {})[SESSION_CREDS_KEY]
-        puts "access_token_hash #{access_token_hash}"
+      def materialize_token_and_client_from_session_if_present
+        access_token_hash = nil
+        begin
+          access_token_hash = self.class.decrypt(@token_encryption_key, (@env["rack.session"] || {})[TOKEN_KEY])
+        rescue
+          return
+        end
         unless access_token_hash.nil?
           endpoint = access_token_hash[:endpoint]
           instance_url = access_token_hash["instance_url"]
           keys = @endpoints[endpoint]
           unless keys.nil?
-            oauth2_client = ::OAuth2::Client.new(
-               keys[:key], keys[:secret], :site => instance_url,
-               :authorize_url => '/services/oauth2/authorize',
-               :token_url     => '/services/oauth2/token'
-            )
-            @env[SESSION_CREDS_KEY]  = ::OAuth2::AccessToken.from_hash(oauth2_client,access_token_hash.dup)
-            @env[SESSION_CLIENT_KEY] = ::Databasedotcom::Client.from_token(@env[SESSION_CREDS_KEY])
+            @env[TOKEN_KEY]  = ::OAuth2::AccessToken.from_hash(client(instance_url, keys[:key], keys[:secret]),access_token_hash.dup)
+            @env[CLIENT_KEY] = ::Databasedotcom::Client.from_token(@env[TOKEN_KEY])
           end
         end
-      end
-
-      def parse_user_id_and_org_id_from_identity_url(identity_url)
       end
 
       def on_path?(path)
@@ -177,11 +149,24 @@ module Databasedotcom
         @request ||= Rack::Request.new(@env)
       end
       
-      def oauth2_client(site_domain, client_id, client_secret)
-        oauth2_client = ::OAuth2::Client.new(
+      def full_host
+        full_host = ENV['ORIGIN']
+        if full_host.nil? || full_host.strip.empty?
+          full_host = URI.parse(request.url.gsub(/\?.*$/,''))
+          full_host.path = ''
+          full_host.query = nil
+          #sometimes the url is actually showing http inside rails because the other layers (like nginx) have handled the ssl termination.
+          full_host.scheme = 'https' if(request.env['HTTP_X_FORWARDED_PROTO'] == 'https')          
+          full_host = full_host.to_s
+        end
+        full_host
+      end
+      
+      def client(site, client_id, client_secret)
+        ::OAuth2::Client.new(
            client_id, 
            client_secret, 
-           :site          => "https://#{site_domain}",
+           :site          => "https://#{self.class.parse_domain(site)}",
            :authorize_url => '/services/oauth2/authorize',
            :token_url     => '/services/oauth2/token'
         )
@@ -194,6 +179,34 @@ module Databasedotcom
         r.finish
       end
       
+      def self.encrypt(secret, data)
+        plain_text_before = [Marshal.dump(data)].pack("m*")
+        plain_text_before = "#{plain_text_before}--#{OpenSSL::HMAC.hexdigest(OpenSSL::Digest::SHA1.new, secret, plain_text_before)}"
+        aes = OpenSSL::Cipher::Cipher.new('aes-128-cbc').encrypt
+        aes.key = secret
+        iv = OpenSSL::Random.random_bytes(aes.iv_len)
+        aes.iv = iv
+        cipher_text = [iv + (aes.update(plain_text_before) << aes.final)].pack('m0')
+        cipher_text
+      end
+
+      def self.decrypt(secret, cipher_text)
+        data = nil
+        unless cipher_text.nil?
+          plain_text_after = cipher_text.unpack('m0').first
+          aes = OpenSSL::Cipher::Cipher.new('aes-128-cbc').decrypt
+          aes.key = secret
+          iv = plain_text_after[0, aes.iv_len]
+          aes.iv = iv
+          crypted_text = plain_text_after[aes.iv_len..-1]
+          return nil if crypted_text.nil? || iv.nil?
+          plain_text_after = aes.update(crypted_text) << aes.final
+          data = plain_text_after.unpack("m*").first
+          data = Marshal.load(data)
+        end
+        data
+      end
+
       def self.sanitize_endpoints(endpoints = nil)
         endpoints = {} unless endpoints.is_a?(Hash)
         endpoints = endpoints.dup
@@ -226,6 +239,19 @@ module Databasedotcom
         end
         url = nil if url && url.strip.empty?
         url
+      end
+
+      def self.param_repeated(url = nil, param_name = nil)
+        return_value = nil
+        unless url.nil? || url.strip.empty? || param_name.nil?
+          url = Addressable::URI.parse(url)
+          param_name = param_name.to_s if param_name.is_a?(Symbol)
+          query_values = url.query_values(:notation => :flat_array)
+          unless query_values.nil? || query_values.empty?
+            return_value = query_values.select{|param| param.is_a?(Array) && param.size >= 2 && param[0] == param_name}.collect{|param| param[1]}
+          end
+        end
+        return_value
       end
 
     end

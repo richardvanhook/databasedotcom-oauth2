@@ -32,15 +32,29 @@
                 %div{:"data-role" => "fieldcontain"}
                   %fieldset{:"data-role" => "controlgroup"}
                     %legend Environment
-                    %label
-                      %input{:type => "radio", :name => "endpoint", :id => "endpoint", :value => "login.salesforce.com", :checked => true}
-                      login.salesforce.com
-                    %label
-                      %input{:type => "radio", :name => "endpoint", :id => "endpoint", :value => "test.salesforce.com"}
-                      test.salesforce.com
-                  %div{:"data-role" => "fieldcontain"}
-                    %label{:for => "options[immediate]"} My Domain URL
-                    %input{:type => "text", :name => "mydomain", :id => "mydomain"}
+                    - settings.endpoints.each do |key,value|
+                      %input{:type => "radio", :name => "endpoint", :id => "endpoint-#{key}", :value => "#{key}", :checked => settings.default_endpoint == key}
+                      %label{:for => "endpoint-#{key}"} #{key}
+                %div{:"data-role" => "fieldcontain"}
+                  %label{:for => "options[immediate]"} My Domain
+                  %input{:type => "text", :name => "mydomain", :id => "mydomain"}
+                %div{:"data-role" => "fieldcontain"}
+                  %fieldset{:"data-role" => "controlgroup"}
+                    %legend Display
+                    - settings.displays.each do |display|
+                      %input{:type => "radio", :name => "display", :id => "display-#{display}", :value => "#{display}", :checked => settings.default_display == display}
+                      %label{:for => "display-#{display}"} #{display}
+                %div{:"data-role" => "fieldcontain"}
+                  %fieldset{:"data-role" => "controlgroup"}
+                    %legend Access Level
+                    - settings.scopes.each do |scope|
+                      %input{:type => "checkbox", :name => "scope", :id => "options[scope|#{scope}]", :value => "#{scope}", :class => "custom", :checked => settings.default_scopes.include?(scope)}
+                      %label{:for => "options[scope|#{scope}]"} #{scope}
+                %div{:"data-role" => "fieldcontain"}
+                  %label{:for => "options[immediate]"} Immediate
+                  %select{:id => "options[immediate]", :name => "immediate", :"data-role" => "slider"}
+                    %option{:value => "false"} No
+                    %option{:value => "true"} Yes
 :javascript
   $(document).bind("mobileinit", function(){
     $.mobile.ajaxEnabled = false;
