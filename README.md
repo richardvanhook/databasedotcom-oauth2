@@ -19,7 +19,7 @@ use Databasedotcom::OAuth2::WebServerFlow,
 
 ## Parameters
 
-### :endpoints
+### `:endpoints`
 
 
 
