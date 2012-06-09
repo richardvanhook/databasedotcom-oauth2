@@ -6,15 +6,38 @@ Rack Middleware for OAuth2 authentication against database.com or salesforce.com
 
 [Sinatra Basic](http://databasedotcom-oauth2-sinatra-basic.herokuapp.com) [(source)](https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-basic)
 
-[Sinatra using JQuery Mobile](http://databasedotcom-oauth2-sinatra-jqm.herokuapp.com) [(source)](https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-jqm)
+[Sinatra showing authentication options along with JQuery Mobile](http://databasedotcom-oauth2-sinatra-jqm.herokuapp.com) [(source)](https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-jqm)
 
 
-## Basic Usage
+## Usage
+
+### Required 
+
+`:token_encryption_key` & `:endpoints` are required.  databasedotcom-oauth2 encrypts oauth2 token using `:token_encryption_key` and stores it in rack.session for further use.  `:endpoints` defines the server endpoints to be available; multiple can be specified but at least one is required.  
 
 ```ruby
 use Databasedotcom::OAuth2::WebServerFlow, 
-  :endpoints            => settings.endpoints, 
-  :token_encryption_key => Base64.strict_decode64(ENV['TOKEN_ENCRYPTION_KEY'])
+  :token_encryption_key => TOKEN_ENCRYPTION_KEY,
+  :endpoints            => {"login.salesforce.com" => {:keys => CLIENT_ID, :secret => CLIENT_SECRET}}
+```
+
+### Multiple Endpoints 
+
+```ruby
+use Databasedotcom::OAuth2::WebServerFlow, 
+  :endpoints            => {"login.salesforce.com" => {:keys => CLIENT_ID1, :secret => CLIENT_SECRET1},
+                            "test.salesforce.com"  => {:keys => CLIENT_ID2, :secret => CLIENT_SECRET2}}
+```
+
+### Authentication Options
+```ruby
+use Databasedotcom::OAuth2::WebServerFlow, 
+  :scope                => "full",  #default is "id api refresh_token"
+  :display              => "touch", #default is "page"
+  :immediate            => true     #default is false
+  :scope_override       => true,    #default is false
+  :display_override     => true,    #default is false
+  :immediate_override   => true,    #default is false
 ```
 
 ## Parameters
@@ -23,7 +46,7 @@ use Databasedotcom::OAuth2::WebServerFlow,
 
 
 
-### :token_encryption_key
+### `:token_encryption_key`
 
 It's uber important that the below encrypted cookie secret
 is sufficiently strong.  Suggest running following to set appropriately:
