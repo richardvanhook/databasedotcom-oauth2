@@ -1,6 +1,4 @@
-require "oauth2"
 require "addressable/uri"
-require "databasedotcom"
 require "cgi"
 require "base64"
 require "openssl"

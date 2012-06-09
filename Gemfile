@@ -1,13 +1,12 @@
-source "http://rubygems.org"
-gem "thin"
-gem "rack-ssl"
-gem "sinatra"
-gem "oauth2"
-gem "addressable"
-gem "databasedotcom"
-gem "haml"
+source 'http://rubygems.org'
 
-group :development do
-  gem "wirble"
-  gem "heroku"
+# Specify your gem's dependencies in omniauth-salesforce.gemspec
+gemspec
+
+group :development, :test do
+  gem 'guard'
+  gem 'guard-rspec'
+  gem 'guard-bundler'
+  gem 'rb-fsevent'
+  gem 'growl'
 end
