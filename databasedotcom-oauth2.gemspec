@@ -15,8 +15,10 @@ Gem::Specification.new do |gem|
   gem.require_paths = ["lib"]
   gem.version       = Databasedotcom::OAuth2::VERSION
 
+  gem.add_dependency 'addressable'
   gem.add_dependency 'databasedotcom'
   gem.add_dependency 'oauth2'
+
   gem.add_development_dependency 'rspec', '~> 2.7'
   gem.add_development_dependency 'rack-test'
   gem.add_development_dependency 'simplecov'

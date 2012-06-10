@@ -48,9 +48,15 @@ use Databasedotcom::OAuth2::WebServerFlow,
 
 ### `:token_encryption_key`
 
-It's uber important that the below encrypted cookie secret
-is sufficiently strong.  Suggest running following to set appropriately:
-$ ruby -ropenssl -rbase64 -e "puts Base64.strict_encode64(OpenSSL::Random.random_bytes(16).to_str)"
+It's uber important that `:token_encryption_key` is sufficiently strong.  To generate a sufficiently strong key, run following:
+
+    $ ruby -ropenssl -rbase64 -e "puts Base64.strict_encode64(OpenSSL::Random.random_bytes(16).to_str)"
+
+Then, in your code, decrypt prior using:
+
+```ruby
+Base64.strict_decode64(TOKEN_ENCRYPTION_KEY)
+```
 
 ## Resources
 

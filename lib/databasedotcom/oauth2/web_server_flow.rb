@@ -1,7 +1,3 @@
-require "addressable/uri"
-require "cgi"
-require "base64"
-require "openssl"
 
 module Databasedotcom
   
@@ -109,7 +105,7 @@ module Databasedotcom
         #populate session with serialized, encrypted token
         #will be used later to materialize actual token and databasedotcom client handle
         @env["rack.session"] ||= {} #in case session is nil
-        @env["rack.session"][TOKEN_KEY] = self.class.encrypt(@token_encryption_key, access_token.to_hash.merge({:endpoint => endpoint}))
+        @env["rack.session"][TOKEN_KEY] = self.class.encrypt(@token_encryption_key, self.class.token_to_hash(access_token).merge({:endpoint => endpoint}))
         redirect state.to_str
       end
 
@@ -177,80 +173,97 @@ module Databasedotcom
         r.finish
       end
       
-      def self.encrypt(secret, data)
-        plain_text_before = [Marshal.dump(data)].pack("m*")
-        plain_text_before = "#{plain_text_before}--#{OpenSSL::HMAC.hexdigest(OpenSSL::Digest::SHA1.new, secret, plain_text_before)}"
-        aes = OpenSSL::Cipher::Cipher.new('aes-128-cbc').encrypt
-        aes.key = secret
-        iv = OpenSSL::Random.random_bytes(aes.iv_len)
-        aes.iv = iv
-        cipher_text = [iv + (aes.update(plain_text_before) << aes.final)].pack('m0')
-        cipher_text
-      end
+      class << self
 
-      def self.decrypt(secret, cipher_text)
-        data = nil
-        unless cipher_text.nil?
-          plain_text_after = cipher_text.unpack('m0').first
-          aes = OpenSSL::Cipher::Cipher.new('aes-128-cbc').decrypt
+        def token_to_hash(token)
+          hsh = token.params.dup
+          hsh[:access_token]  = token.token
+          hsh[:refresh_token] = token.refresh_token
+          hsh[:expires_in]    = token.expires_in
+          hsh[:expires_at]    = token.expires_at
+          hsh[:mode]          = token.options[:mode]
+          hsh[:header_format] = token.options[:header_format]
+          hsh[:param_name]    = token.options[:param_name]
+          hsh
+        end
+
+        def encrypt(secret, data)
+          plain_text_before = [Marshal.dump(data)].pack("m*")
+          plain_text_before = "#{plain_text_before}--#{OpenSSL::HMAC.hexdigest(OpenSSL::Digest::SHA1.new, secret, plain_text_before)}"
+          aes = OpenSSL::Cipher::Cipher.new('aes-128-cbc').encrypt
           aes.key = secret
-          iv = plain_text_after[0, aes.iv_len]
+          iv = OpenSSL::Random.random_bytes(aes.iv_len)
           aes.iv = iv
-          crypted_text = plain_text_after[aes.iv_len..-1]
-          return nil if crypted_text.nil? || iv.nil?
-          plain_text_after = aes.update(crypted_text) << aes.final
-          data = plain_text_after.unpack("m*").first
-          data = Marshal.load(data)
+          cipher_text = [iv + (aes.update(plain_text_before) << aes.final)].pack('m0')
+          cipher_text
         end
-        data
-      end
 
-      def self.sanitize_endpoints(endpoints = nil)
-        endpoints = {} unless endpoints.is_a?(Hash)
-        endpoints = endpoints.dup
-        endpoints.keep_if do |key,value| 
-          value.is_a?(Hash)       &&
-          value.has_key?(:key)    && 
-          value.has_key?(:secret) &&
-          !value[:key].nil?       && 
-          !value[:secret].nil?    && 
-          !value[:key].empty?     && 
-          !value[:secret].empty?
+        def decrypt(secret, cipher_text)
+          data = nil
+          unless cipher_text.nil?
+            plain_text_after = cipher_text.unpack('m0').first
+            aes = OpenSSL::Cipher::Cipher.new('aes-128-cbc').decrypt
+            aes.key = secret
+            iv = plain_text_after[0, aes.iv_len]
+            aes.iv = iv
+            crypted_text = plain_text_after[aes.iv_len..-1]
+            return nil if crypted_text.nil? || iv.nil?
+            plain_text_after = aes.update(crypted_text) << aes.final
+            data = plain_text_after.unpack("m*").first
+            data = Marshal.load(data)
+          end
+          data
         end
-        #set random default if default isn't already populated
-        if !endpoints.empty? && endpoints.default.nil?
-          endpoints.default = endpoints[endpoints.keys.first]
-        end
-        endpoints
-      end
 
-      def self.parse_domain(url = nil)
-        unless url.nil?
-          url = "https://" + url if (url =~ /http[s]?:\/\//).nil?
-          begin
+        def sanitize_endpoints(endpoints = nil)
+          endpoints = {} unless endpoints.is_a?(Hash)
+          endpoints = endpoints.dup
+          endpoints.keep_if do |key,value| 
+            value.is_a?(Hash)       &&
+            value.has_key?(:key)    && 
+            value.has_key?(:secret) &&
+            !value[:key].nil?       && 
+            !value[:secret].nil?    && 
+            !value[:key].empty?     && 
+            !value[:secret].empty?
+          end
+          #set random default if default isn't already populated
+          if !endpoints.empty? && endpoints.default.nil?
+            endpoints.default = endpoints[endpoints.keys.first]
+          end
+          endpoints
+        end
+
+        def parse_domain(url = nil)
+          unless url.nil?
+            url = "https://" + url if (url =~ /http[s]?:\/\//).nil?
+            begin
+              url = Addressable::URI.parse(url)
+            rescue Addressable::URI::InvalidURIError
+              url = nil
+            end
+            url = url.host unless url.nil?
+            url.strip! unless url.nil?
+          end
+          url = nil if url && url.strip.empty?
+          url
+        end
+
+        def param_repeated(url = nil, param_name = nil)
+          return_value = nil
+          unless url.nil? || url.strip.empty? || param_name.nil?
             url = Addressable::URI.parse(url)
-          rescue Addressable::URI::InvalidURIError
-            url = nil
+            param_name = param_name.to_s if param_name.is_a?(Symbol)
+            query_values = url.query_values(:notation => :flat_array)
+            unless query_values.nil? || query_values.empty?
+              return_value = query_values.select{|param| param.is_a?(Array) && param.size >= 2 && param[0] == param_name}.collect{|param| param[1]}
+            end
           end
-          url = url.host unless url.nil?
-          url.strip! unless url.nil?
+          return_value
         end
-        url = nil if url && url.strip.empty?
-        url
-      end
 
-      def self.param_repeated(url = nil, param_name = nil)
-        return_value = nil
-        unless url.nil? || url.strip.empty? || param_name.nil?
-          url = Addressable::URI.parse(url)
-          param_name = param_name.to_s if param_name.is_a?(Symbol)
-          query_values = url.query_values(:notation => :flat_array)
-          unless query_values.nil? || query_values.empty?
-            return_value = query_values.select{|param| param.is_a?(Array) && param.size >= 2 && param[0] == param_name}.collect{|param| param[1]}
-          end
-        end
-        return_value
       end
+      
 
     end
     
