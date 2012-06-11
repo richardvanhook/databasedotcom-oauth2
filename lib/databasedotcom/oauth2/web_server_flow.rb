@@ -1,3 +1,10 @@
+require "addressable/uri"
+require "cgi"
+require "base64"
+require "openssl"
+require "oauth2"
+require "databasedotcom"
+
 
 module Databasedotcom
   
