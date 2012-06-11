@@ -20,6 +20,14 @@ module Databasedotcom
         unless options.nil?
           @endpoints            = self.class.sanitize_endpoints(options[:endpoints])
           @token_encryption_key = options[:token_encryption_key]
+          @path_prefix          = options[:path_prefix]
+          @on_failure           = options[:on_failure]
+          @scope                = options[:scope]
+          @display              = options[:display]
+          @immediate            = options[:immediate]
+          @scope_override       = options[:scope_override]     || false
+          @display_override     = options[:display_override]   || false
+          @immediate_override   = options[:immediate_override] || false
         end
 
         fail "\n\ndatabasedotcom-oauth2 initialization error!  :endpoints parameter " \
@@ -36,6 +44,9 @@ module Databasedotcom
           + "and:\n\n$ ruby -ropenssl -rbase64 -e \"puts Base64.strict_encode64(OpenS" \
           + "SL::Random.random_bytes(16).to_str)\"\n\n"                                \
           if @token_encryption_key.nil? || @token_encryption_key.size < 16
+            
+        @path_prefix = "/auth/salesforce" unless @path_prefix.is_a?(String) && !@path_prefix.strip.empty?
+        @on_failure = nil unless @on_failure.is_a?(Proc)
       end                
 
       def call(env)
@@ -44,16 +55,27 @@ module Databasedotcom
 
       def call!(env)
         @env = env
-        return authorize_call if on_authorize_path?
-        return callback_call  if on_callback_path?
-        materialize_token_and_client_from_session_if_present
+        begin
+          return authorize_call if on_authorize_path?
+          return callback_call  if on_callback_path?
+          materialize_token_and_client_from_session_if_present
+        rescue Exception => e
+          self.class._log_exception(e)
+          if @on_failure.nil?
+            new_path = Addressable::URI.parse(@path_prefix + "/failure")
+            new_path.query_values={:message => e.message, :state => request.params['state']}
+            return [302, {'Location' => new_path.to_s, 'Content-Type'=> 'text/html'}, []]
+          else
+            return @on_failure.call(env,e)
+          end
+        end
         @app.call(env)
       end
 
       private
 
       def on_authorize_path?
-        on_path? "/auth/salesforce"
+        on_path?(@path_prefix)
       end
 
       def authorize_call
@@ -68,44 +90,64 @@ module Databasedotcom
         mydomain = mydomain.split(/\./).first + ".my.salesforce.com" unless mydomain.nil?
 
         #add endpoint to relay state so callback knows which keys to use
-        state = Addressable::URI.parse(request.params["state"] || "/")
+        request.params["state"] ||= "/"
+        state = Addressable::URI.parse(request.params["state"])
         state.query_values={} unless state.query_values
         state.query_values= state.query_values.merge({:endpoint => endpoint})
         
         #build params hash to be passed to ouath2 authorize redirect url
         auth_params = {
-          :redirect_uri  => "#{full_host}/auth/salesforce/callback",
+          :redirect_uri  => "#{full_host}#{@path_prefix}/callback",
           :state         => state.to_s
         }
-        scope = (self.class.param_repeated(request.url, :scope) || []).join(" ")
-        auth_params[:scope]     = scope                       unless scope.nil? || scope.strip.empty?
-        auth_params[:display]   = request.params["display"]   unless request.params["display"].nil?
-        auth_params[:immediate] = request.params["immediate"] unless request.params["immediate"].nil?
+        auth_params[:scope]     = @scope     unless @scope.nil? || @scope.strip.empty?
+        auth_params[:display]   = @display   unless @display.nil?
+        auth_params[:immediate] = @immediate unless @immediate.nil?
+        
+        #overrides
+        overrides = {}
+        if @scope_override
+          scope = (self.class.param_repeated(request.url, :scope) || []).join(" ")
+          overrides[:scope] = scope unless scope.nil? || scope.strip.empty?
+        end
+        overrides[:display]   = request.params["display"]   unless !@display_override   || request.params["display"].nil?
+        overrides[:immediate] = request.params["immediate"] unless !@immediate_override || request.params["immediate"].nil?
 
+        auth_params.merge!(overrides)
+        
         #do redirect
         redirect client(mydomain || endpoint, keys[:key], keys[:secret]).auth_code.authorize_url(auth_params)
       end
       
       def on_callback_path?
-        on_path? "/auth/salesforce/callback"
+        on_path?(@path_prefix + "/callback")
       end
 
       def callback_call
+        #check for error
+        callback_error         = request.params["error"]         
+        callback_error_details = request.params["error_description"]
+        fail "#{callback_error} #{callback_error_details}" unless callback_error.nil? || callback_error.strip.empty? 
+                
         #grab authorization code
         code = request.params["code"]
-        
         #grab and remove endpoint from relay state
         #upon successful retrieval of token, state is url where user will be redirected to
-        state = Addressable::URI.parse(request.params["state"] || "/")
+        request.params["state"] ||= "/"
+        puts "state param #{request.params["state"]}"
+        state = Addressable::URI.parse(request.params["state"])
         state.query_values= {} if state.query_values.nil?
         state_params = state.query_values.dup
         endpoint = state_params.delete("endpoint")
         keys = @endpoints[endpoint]
         state.query_values= state_params
+        state = state.to_s
+        state.sub!(/\?$/,"") unless state.nil?
+        puts "state #{state.to_s}"
 
         #do callout to retrieve token
         access_token = client(endpoint, keys[:key], keys[:secret]).auth_code.get_token(code, 
-          :redirect_uri => "#{full_host}/auth/salesforce/callback")
+          :redirect_uri => "#{full_host}#{@path_prefix}/callback")
         access_token.options[:mode] = :query
         access_token.options[:param_name] = :oauth_token
         
@@ -181,6 +223,12 @@ module Databasedotcom
       end
       
       class << self
+
+        def _log_exception(exception)
+          STDERR.puts "\n\n#{exception.class} (#{exception.message}):\n    " +
+            exception.backtrace.join("\n    ") +
+            "\n\n"
+        end
 
         def token_to_hash(token)
           hsh = token.params.dup
