@@ -6,9 +6,7 @@ Rack Middleware for OAuth2 authentication against database.com or salesforce.com
 
 [Sinatra Basic](https://db-oauth2-sinatra-basic.herokuapp.com) [(source)](https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-basic)
 
-<!---
 [Sinatra showing authentication options along with JQuery Mobile](http://databasedotcom-oauth2-sinatra-jqm.herokuapp.com) [(source)](https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-jqm)
--->
 
 ## Usage
 
@@ -29,7 +27,6 @@ use Databasedotcom::OAuth2::WebServerFlow,
   :endpoints            => {"login.salesforce.com" => {:keys => CLIENT_ID1, :secret => CLIENT_SECRET1},
                             "test.salesforce.com"  => {:keys => CLIENT_ID2, :secret => CLIENT_SECRET2}}
 ```
-<!---
 ### Authentication Options
 ```ruby
 use Databasedotcom::OAuth2::WebServerFlow, 
@@ -40,7 +37,6 @@ use Databasedotcom::OAuth2::WebServerFlow,
   :display_override     => true,    #default is false
   :immediate_override   => true,    #default is false
 ```
--->
 
 ## Parameters
 
