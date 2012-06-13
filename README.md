@@ -4,9 +4,9 @@ Rack Middleware for OAuth2 authentication against database.com or salesforce.com
 
 ## Demos
 
-[Sinatra Basic](https://db-oauth2-sinatra-basic.herokuapp.com) [(source)](https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-basic)
+<a href="https://db-oauth2-sinatra-basic.herokuapp.com" target="_blank">Sinatra Basic</a><a href="https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-basic" target="_blank">(source)</a>
 
-[Sinatra showing authentication options along with JQuery Mobile](http://databasedotcom-oauth2-sinatra-jqm.herokuapp.com) [(source)](https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-jqm)
+<a href="https://db-oauth2-sinatra-jqm.herokuapp.com" target="_blank">Sinatra showing authentication options along with JQuery Mobile</a><a href="https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-jqm" target="_blank">(source)</a>
 
 ## Usage
 
