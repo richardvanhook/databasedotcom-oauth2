@@ -1,20 +1,32 @@
-require "addressable/uri"
-require "cgi"
-require "base64"
-require "openssl"
-require "oauth2"
-require "databasedotcom"
-
-
 module Databasedotcom
-  
   module OAuth2
+    TOKEN_KEY  = "databasedotcom.token"
+    CLIENT_KEY = "databasedotcom.client"
     
+    module Helpers
+      def client
+        env['databasedotcom.client']
+      end
+
+      def token
+        env['databasedotcom.token']
+      end
+
+    	def unauthenticated?
+    	  client.nil?
+  	  end
+
+    	def authenticated?
+    	  !unauthenticated?
+    	end
+    	
+    	def me
+    	  @me ||= ::Hashie::Mash.new(Databasedotcom::Chatter::User.find(client, "me").raw_hash)
+  	  end
+    end
+
     class WebServerFlow
 
-      TOKEN_KEY  = "databasedotcom.token"
-      CLIENT_KEY = "databasedotcom.client"
-      
       def initialize(app, options = nil)
         @app = app       
         unless options.nil?
@@ -134,7 +146,6 @@ module Databasedotcom
         #grab and remove endpoint from relay state
         #upon successful retrieval of token, state is url where user will be redirected to
         request.params["state"] ||= "/"
-        puts "state param #{request.params["state"]}"
         state = Addressable::URI.parse(request.params["state"])
         state.query_values= {} if state.query_values.nil?
         state_params = state.query_values.dup
@@ -143,7 +154,6 @@ module Databasedotcom
         state.query_values= state_params
         state = state.to_s
         state.sub!(/\?$/,"") unless state.nil?
-        puts "state #{state.to_s}"
 
         #do callout to retrieve token
         access_token = client(endpoint, keys[:key], keys[:secret]).auth_code.get_token(code, 
@@ -318,8 +328,6 @@ module Databasedotcom
         end
 
       end
-      
-
     end
     
   end

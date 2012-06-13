@@ -1,5 +1,3 @@
-require "databasedotcom"
-
 Databasedotcom::Client.class_eval do
 
   def self.from_token(token)
@@ -14,7 +12,7 @@ Databasedotcom::Client.class_eval do
       org_id        = m[1] rescue nil
       user_id       = m[2] rescue nil
       client.set_org_and_user_id(org_id,user_id)
-      client.version       = "23.0"
+      client.version       = "24.0"
       client.instance_url  = token.client.site
       client.oauth_token   = token.token
       client.refresh_token = token.refresh_token
