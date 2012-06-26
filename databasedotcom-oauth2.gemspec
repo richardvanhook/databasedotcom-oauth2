@@ -17,6 +17,7 @@ Gem::Specification.new do |gem|
 
   gem.add_dependency 'addressable'
   gem.add_dependency 'hashie'
+  gem.add_dependency 'gibberish'
   gem.add_dependency 'databasedotcom'
   gem.add_dependency 'oauth2'
 
