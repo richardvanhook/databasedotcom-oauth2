@@ -46,7 +46,6 @@ module Databasedotcom
   end
 
   module OAuth2
-    VERSION    = "0.1.4"
     TOKEN_KEY  = "databasedotcom.token"
     CLIENT_KEY = "databasedotcom.client"
     
