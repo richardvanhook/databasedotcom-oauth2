@@ -1,6 +1,21 @@
 # databasedotcom-oauth2
 
-Rack Middleware for OAuth2 authentication against database.com or salesforce.com, and interaction via the databasedotcom gem.
+Rack Middleware for OAuth2 authentication against, and interaction with salesforce.com via the databasedotcom gem.  
+
+### Who's it for?
+
+RubyDevelopers of 
+Whereas OmniAuth only provides authentication, this Rack Middleware assumes you lso instantiates a Databasedotcom::Client while providing an 
+
+ authentication and  you need to query or manipulate salesforce.com data in addition to authentication.
+
+### Benefits:
+
+* Hides OAuth2 hand-shake complexity against multiple salesforce.com endpoints (prod vs sandbox) including support for My Domain.
+* Configurable/override-able options for scope, display, immediate
+* OAuth2 Token encrypted and stored in session, supports any Rack:Session type - Cookie, Pool, etc.
+* Materializes Databasedotcom::Client from token upon each request
+* Databasedotcom::OAuth2::Helpers mixin provides convenience methods client, me, etc.
 
 ## Demos
 
