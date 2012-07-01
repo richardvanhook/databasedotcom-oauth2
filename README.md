@@ -84,6 +84,8 @@ Required Configuration Parameters
                    "test.salesforce.com"  => {:key => "replace me", :secret => "replace me"}}
      ```
 
+     *Default:* nil
+
 * **`:token_encryption_key`**
 
     Encrypts OAuth 2.0 token prior to persistence in session store.  Any Rack session store can be used:  Rack:Session:Cookie, Rack:Session:Pool, etc.  A sufficiently strong key **must** be generated.  It's recommended you use the following command to generate a random key value.  
@@ -104,6 +106,8 @@ Required Configuration Parameters
     require "base64"
     Base64.strict_decode64(ENV['TOKEN'])
     ```
+
+    *Default:* nil
     
 Optional Configuration Parameters
 -----------------------------------
@@ -140,7 +144,7 @@ Optional Configuration Parameters
 
 * **`:path_prefix`**
 
-    The path that signals databasedot-oauth2 to initiate authentication with salesforce.com.
+    The path that signals databasedotcom-oauth2 to initiate authentication with salesforce.com.
 
     *Default:* /auth/salesforce
   
