@@ -30,29 +30,36 @@ Usage
 ### Minimal 
 
 ```ruby
+require "databasedotcom-oauth"
 use Databasedotcom::OAuth2::WebServerFlow, 
   :token_encryption_key => "replace me",
-  :endpoints            => {"login.salesforce.com" => {:key => "replace me", :secret => "replace me"}}
+  :endpoints => {"login.salesforce.com" => {:key => "replace me", :secret => "replace me"}}
 ```
 
-See [Required Configuration Parameters](#required-configuration-parameters) for more information.
+Insert above code wherever your [Rack](http://rack.github.com/) Stack is defined.  See [Required Configuration Parameters](#required-configuration-parameters) for more information on parameters.
 
 ### Multiple Endpoints 
 
 ```ruby
 use Databasedotcom::OAuth2::WebServerFlow, 
-  :endpoints            => {"login.salesforce.com" => {:key => CLIENT_ID1, :secret => CLIENT_SECRET1},
-                            "test.salesforce.com"  => {:key => CLIENT_ID2, :secret => CLIENT_SECRET2}}
+  :endpoints => {"login.salesforce.com" => {:key => "replace me", :secret => "replace me"},
+                 "test.salesforce.com"  => {:key => "replace me", :secret => "replace me"}}
 ```
-### Authentication Options
+
+### Authentication
 ```ruby
 use Databasedotcom::OAuth2::WebServerFlow, 
-  :scope                => "full",  #default is "id api refresh_token"
-  :display              => "touch", #default is "page"
-  :immediate            => true     #default is false
-  :scope_override       => true,    #default is false
-  :display_override     => true,    #default is false
-  :immediate_override   => true,    #default is false
+  :scope     => "full" , #default is "id api refresh_token"
+  :display   => "touch", #default is "page"
+  :immediate => true     #default is false
+```
+
+### Miscellaneous
+```ruby
+use Databasedotcom::OAuth2::WebServerFlow, 
+  :api_version => "24.0"      , #default is 25.0
+  :debugging   => "true"      , #default is false
+  :path_prefix => "/auth/sfdc"  #default is /auth/salesforce
 ```
 
 Required Configuration Parameters
