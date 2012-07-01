@@ -112,7 +112,7 @@ Optional Configuration Parameters
 
     Values passed directly to salesforce which control salesforce authentication behavior.  See [OAuth 2.0 Web Server Authentication Flow](http://na12.salesforce.com/help/doc/en/remoteaccess_oauth_web_server_flow.htm#heading_2_1) for detailed explanation as well as valid and default values.
 
-    __Default:__ see [OAuth 2.0 Web Server Authentication Flow](http://na12.salesforce.com/help/doc/en/remoteaccess_oauth_web_server_flow.htm#heading_2_1)
+    _Default:_ see [OAuth 2.0 Web Server Authentication Flow](http://na12.salesforce.com/help/doc/en/remoteaccess_oauth_web_server_flow.htm#heading_2_1)
     
 * **`:display_override`,`:immediate_override`,`:scope_override`**
 
