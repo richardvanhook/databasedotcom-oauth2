@@ -1,16 +1,3 @@
-<script src="/syntaxhighlighter/scripts/shCore.js"         type="text/javascript"></script>
-<script src="/syntaxhighlighter/scripts/shBrushBash.js"    type="text/javascript"></script>
-<script src="/syntaxhighlighter/scripts/shBrushPlain.js"    type="text/javascript"></script>
-<script src="/syntaxhighlighter/scripts/shBrushRuby.js"    type="text/javascript"></script>
-<link  href="/syntaxhighlighter/styles/shCore.css"         rel="stylesheet"></link>
-<link  href="/syntaxhighlighter/styles/shThemeMidnight.css" rel="stylesheet" type="text/css" />
-<script type="text/javascript">
-  SyntaxHighlighter.defaults['toolbar'] = true;
-  SyntaxHighlighter.config.space=' ';
-  SyntaxHighlighter.all()
-</script>
-
-
 What is databasedotcom-oauth2?
 ------------------------------
 * an extension of the [databasedotcom](https://rubygems.org/gems/databasedotcom) gem that simplifies authentication and authorization with [salesforce.com](http://salesforce.com/) for Ruby web apps via OAuth 2.0
