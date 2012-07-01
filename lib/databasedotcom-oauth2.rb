@@ -50,11 +50,6 @@ module Databasedotcom
       client
     end
 
-    #def set_org_and_user_id(orgid, userid)
-    #  @org_id        = orgid
-    #  @user_id       = userid
-    #end
-
     def org_id=(val)
       @org_id = val
     end
@@ -319,7 +314,6 @@ module Databasedotcom
           full_host = URI.parse(request.url.gsub(/\?.*$/,''))
           full_host.path = ''
           full_host.query = nil
-          #sometimes the url is actually showing http inside rails because the other layers (like nginx) have handled the ssl termination.
           full_host.scheme = 'https' if(request.env['HTTP_X_FORWARDED_PROTO'] == 'https')          
           full_host = full_host.to_s
         end
