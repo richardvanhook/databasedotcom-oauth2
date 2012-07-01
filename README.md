@@ -27,18 +27,15 @@ Demos
 Usage
 -------
 
-### Required 
-
-`:token_encryption_key` & `:endpoints` are required.  databasedotcom-oauth2 encrypts oauth2 token using `:token_encryption_key` and stores it in rack.session for further use.  `:endpoints` defines the server endpoints to be available; multiple can be specified but at least one is required.  
-
-<pre class="brush: ruby">
-  use Databasedotcom::OAuth2::WebServerFlow, 
-    :token_encryption_key => TOKEN_ENCRYPTION_KEY,
-    :endpoints            => {"login.salesforce.com" => {:key => CLIENT_ID, :secret => CLIENT_SECRET}}
-</pre>  
+### Minimal 
 
 ```ruby
+use Databasedotcom::OAuth2::WebServerFlow, 
+  :token_encryption_key => "replace me",
+  :endpoints            => {"login.salesforce.com" => {:key => "replace me", :secret => "replace me"}}
 ```
+
+See [Required Configuration Parameters](#required-configuration-parameters) for more information.
 
 ### Multiple Endpoints 
 
@@ -63,7 +60,7 @@ Required Configuration Parameters
 
 * **`:endpoints`**
 
-    Hash of remote access applications; at least one is required.  Values must be generated via salesforce at Setup > App Setup > Develop > Remote Access.  Only one remote access application is needed for production, sandbox, or pre-release; separate entries are not necessary for My Domain.
+    Hash of remote access applications; at least one is required.  Values must be generated via [salesforce.com](http://salesforce.com/) at Setup > App Setup > Develop > Remote Access.  Only one remote access application is needed for production, sandbox, or pre-release; separate entries are not necessary for My Domain.
 
     Example:
     ```ruby
@@ -101,7 +98,7 @@ Optional Configuration Parameters
 
 * **`:display`, `:immediate`, `:scope`**
 
-    Values passed directly to salesforce which control salesforce authentication behavior.  See [OAuth 2.0 Web Server Authentication Flow](http://na12.salesforce.com/help/doc/en/remoteaccess_oauth_web_server_flow.htm#heading_2_1) for detailed explanation as well as valid and default values.
+    Values passed directly to [salesforce.com](http://salesforce.com/) which control authentication behavior.  See [OAuth 2.0 Web Server Authentication Flow](http://na12.salesforce.com/help/doc/en/remoteaccess_oauth_web_server_flow.htm#heading_2_1) for detailed explanation as well as valid and default values.
 
     *Default:* see [OAuth 2.0 Web Server Authentication Flow](http://na12.salesforce.com/help/doc/en/remoteaccess_oauth_web_server_flow.htm#heading_2_1)
     
