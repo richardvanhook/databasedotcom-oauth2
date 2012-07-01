@@ -96,12 +96,14 @@ module Databasedotcom
           @token_encryption_key = options[:token_encryption_key]
           @path_prefix          = options[:path_prefix]
           @on_failure           = options[:on_failure]
-          @scope                = options[:scope]
           @display              = options[:display]
           @immediate            = options[:immediate]
-          @scope_override       = options[:scope_override]     || false
+          @prompt               = options[:prompt]
+          @scope                = options[:scope]
           @display_override     = options[:display_override]   || false
           @immediate_override   = options[:immediate_override] || false
+          @prompt_override      = options[:prompt_override] || false
+          @scope_override       = options[:scope_override]     || false
           @api_version          = options[:api_version]        || "25.0"
           @debugging            = options[:debugging]          || false
         end
@@ -175,18 +177,20 @@ module Databasedotcom
           :redirect_uri  => "#{full_host}#{@path_prefix}/callback",
           :state         => state.to_str
         }
-        auth_params[:scope]     = @scope     unless @scope.nil? || @scope.strip.empty?
         auth_params[:display]   = @display   unless @display.nil?
         auth_params[:immediate] = @immediate unless @immediate.nil?
-        
+        auth_params[:prompt]    = @prompt    unless @prompt.nil?
+        auth_params[:scope]     = @scope     unless @scope.nil? || @scope.strip.empty?
+
         #overrides
         overrides = {}
+        overrides[:display]   = request.params["display"]   unless !@display_override   || request.params["display"].nil?
+        overrides[:immediate] = request.params["immediate"] unless !@immediate_override || request.params["immediate"].nil?
+        overrides[:prompt]    = request.params["prompt"]    unless !@prompt_override || request.params["prompt"].nil?
         if @scope_override
           scope = (self.class.param_repeated(request.url, :scope) || []).join(" ")
           overrides[:scope] = scope unless scope.nil? || scope.strip.empty?
         end
-        overrides[:display]   = request.params["display"]   unless !@display_override   || request.params["display"].nil?
-        overrides[:immediate] = request.params["immediate"] unless !@immediate_override || request.params["immediate"].nil?
         auth_params.merge!(overrides)
         
         #do redirect

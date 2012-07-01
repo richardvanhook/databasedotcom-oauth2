@@ -49,9 +49,10 @@ use Databasedotcom::OAuth2::WebServerFlow,
 ### Authentication
 ```ruby
 use Databasedotcom::OAuth2::WebServerFlow, 
-  :scope     => "full" , #default is "id api refresh_token"
-  :display   => "touch", #default is "page"
-  :immediate => true     #default is false
+  :display   => "touch"        , #default is "page"
+  :immediate => true           , #default is false
+  :prompt    => "login consent", #default is nil
+  :scope     => "full"           #default is "id api refresh_token"
 ```
 
 ### Miscellaneous
@@ -103,13 +104,13 @@ Required Configuration Parameters
 Optional Configuration Parameters
 -----------------------------------
 
-* **`:display`, `:immediate`, `:scope`**
+* **`:display`, `:immediate`, `:prompt`, `:scope`**
 
     Values passed directly to [salesforce.com](http://salesforce.com/) which control authentication behavior.  See [OAuth 2.0 Web Server Authentication Flow](http://na12.salesforce.com/help/doc/en/remoteaccess_oauth_web_server_flow.htm#heading_2_1) for detailed explanation as well as valid and default values.
 
     *Default:* see [OAuth 2.0 Web Server Authentication Flow](http://na12.salesforce.com/help/doc/en/remoteaccess_oauth_web_server_flow.htm#heading_2_1)
     
-* **`:display_override`,`:immediate_override`,`:scope_override`**
+* **`:display_override`,`:immediate_override`, `:prompt_override`,`:scope_override`**
 
     Allow correspondingly named parameter to be overridden at runtime via http parameter of same name.  For example, if your app is capable of detecting the client device type, set **`:display_override`** to true and pass a display http parameter to `/auth/salesforce`.  
 
