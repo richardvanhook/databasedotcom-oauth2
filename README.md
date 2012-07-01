@@ -6,7 +6,7 @@ What is databasedotcom-oauth2?
 
 When and why should I use it instead of OmniAuth?
 ---------------------------------------------------------------
-Many Ruby web apps integrated with [salesforce.com](http://salesforce.com/) need more than just identification, they also need to __interact__ with [salesforce.com](http://salesforce.com/) via the databasedotcom gem.  Both OmniAuth and databasedotcom-oauth2 provide identification; however, databasedotcom-oauth2 makes the interaction part easier. 
+Many Ruby web apps integrated with [salesforce.com](http://salesforce.com/) need more than just identification, they also need to _interact_ with [salesforce.com](http://salesforce.com/) via the [databasedotcom](https://rubygems.org/gems/databasedotcom) gem.  Both OmniAuth and databasedotcom-oauth2 provide identification; however, databasedotcom-oauth2 makes the interaction part easier. 
 
 Specifically, databasedotcom-oauth2:
 
@@ -14,7 +14,7 @@ Specifically, databasedotcom-oauth2:
 * supports configuration of scope, display, and immediate OAuth 2.0 parameters
 * supports My Domain
 * maintains an encrypted OAuth 2.0 token in whatever session store you choose (Cookie, Pool, etc)
-* materializes a databasedotcom client upon each request (using the token in session)
+* materializes a [databasedotcom](https://rubygems.org/gems/databasedotcom) client upon each request (using the token in session)
 * provides a mixin for your app containing utility methods like unauthenticated?, client, etc.
 
 Demos
@@ -119,7 +119,7 @@ Optional Configuration Parameters
 
 * **`:debugging`**
 
-    Will enable debug output for both this gem and `databasedotcom`.
+    Will enable debug output for both this gem and [databasedotcom](https://rubygems.org/gems/databasedotcom).
 
     *Default:* false
 
