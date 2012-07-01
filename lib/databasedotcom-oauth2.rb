@@ -102,7 +102,7 @@ module Databasedotcom
           @scope_override       = options[:scope_override]     || false
           @display_override     = options[:display_override]   || false
           @immediate_override   = options[:immediate_override] || false
-          @api_version          = options[:api_version]        || "24.0"
+          @api_version          = options[:api_version]        || "25.0"
           @debugging            = options[:debugging]          || false
         end
 

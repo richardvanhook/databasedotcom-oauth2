@@ -108,16 +108,51 @@ Required Configuration Parameters
 Optional Configuration Parameters
 -----------------------------------
 
-### **`:api_version`**
-### **`:debugging`**
-### **`:display`**
-### **`:display_override`**
-### **`:immediate`**
-### **`:immediate_override`**
-### **`:on_failure`**
-### **`:path_prefix`**
-### **`:scope`**
-### **`:scope_override`**
+* **`:api_version`**
+
+    For explanation of api versions, see [http://www.salesforce.com/us/developer/docs/api/Content/whats_new.htm]
+    Default: 25.0
+
+* **`:debugging`**
+
+    Will enable debug output for both this gem and `databasedotcom`.
+    Default: false
+
+* **`:display`**
+
+    Changes the login and authorization pages’ display type.  
+    Per [OAuth 2.0 Web Server Authentication Flow](http://login.salesforce.com/help/doc/en/remoteaccess_oauth_web_server_flow.htm), valid values are:
+    * page—Full-page authorization screen. This is the default value if none is specified.
+    * popup—Compact dialog optimized for modern web browser popup windows.
+    * touch—mobile-optimized dialog designed for modern smartphones such as Android and iPhone.
+    * mobile—mobile optimized dialog designed for less capable smartphones such as BlackBerry OS 5
+
+* **`:display_override`**
+
+    Allow display to be overridden at runtime.  
+    Default: false.
+
+* **`:immediate`**
+
+
+
+* **`:immediate_override`**
+
+
+
+* **`:on_failure`**
+
+
+
+* **`:path_prefix`**
+
+
+
+* **`:scope`**
+
+    
+
+* **`:scope_override`**
 
 ## Resources
 
