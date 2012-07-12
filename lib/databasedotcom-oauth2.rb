@@ -7,70 +7,28 @@ require "gibberish"
 require "databasedotcom"
 require "oauth2"
 
-module OAuth2
-  class AccessToken
-    attr_accessor :client
-  end
-end
-
 module Databasedotcom
   
-  def self.parse_domain(url = nil)
-    unless url.nil?
-      url = "https://" + url if (url =~ /http[s]?:\/\//).nil?
-      begin
-        url = Addressable::URI.parse(url)
-      rescue Addressable::URI::InvalidURIError
-        url = nil
-      end
-      url = url.host unless url.nil?
-      url.strip! unless url.nil?
-    end
-    url = nil if url && url.strip.empty?
-    url
-  end
-
   class Client
-    def self.from_token(token, api_version)
-      client = nil
-      unless token.nil?
-        client = self.new({
-          :client_id     => token.client.id, 
-          :client_secret => token.client.secret, 
-          :host          => Databasedotcom.parse_domain(token.client.site)
-        })
-        m = token["id"].match(/\/id\/([^\/]+)\/([^\/]+)$/)
-        client.org_id        = m[1] rescue nil
-        client.user_id       = m[2] rescue nil
-        client.version       = api_version
-        client.instance_url  = token.client.site
-        client.oauth_token   = token.token
-        client.refresh_token = token.refresh_token
-      end
-      client
-    end
-
-    def org_id=(val)
-      @org_id = val
-    end
-
-    def user_id=(val)
-      @user_id = val
+    
+    attr_accessor :org_id
+    attr_accessor :user_id
+    attr_accessor :endpoint
+    attr_accessor :last_seen
+    attr_accessor :logout_flag
+    
+    def logout
+      @logout_flag = true
     end
 
   end
 
   module OAuth2
-    TOKEN_KEY  = "databasedotcom.token"
     CLIENT_KEY = "databasedotcom.client"
     
     module Helpers
       def client
-        env['databasedotcom.client']
-      end
-
-      def token
-        env['databasedotcom.token']
+        env[CLIENT_KEY]
       end
 
     	def unauthenticated?
@@ -83,7 +41,6 @@ module Databasedotcom
     	
     	def me
     	  @me ||= ::Hashie::Mash.new(Databasedotcom::Chatter::User.find(client, "me").raw_hash)
-    	  #@me.organization_id
   	  end
     end
 
@@ -102,7 +59,7 @@ module Databasedotcom
           @scope                = options[:scope]
           @display_override     = options[:display_override]   || false
           @immediate_override   = options[:immediate_override] || false
-          @prompt_override      = options[:prompt_override] || false
+          @prompt_override      = options[:prompt_override]    || false
           @scope_override       = options[:scope_override]     || false
           @api_version          = options[:api_version]        || "25.0"
           @debugging            = options[:debugging]          || false
@@ -136,7 +93,6 @@ module Databasedotcom
         begin
           return authorize_call if on_authorize_path?
           return callback_call  if on_callback_path?
-          materialize_token_and_client_from_session_if_present
         rescue Exception => e
           self.class._log_exception(e)
           if @on_failure.nil?
@@ -147,7 +103,10 @@ module Databasedotcom
             return @on_failure.call(env,e)
           end
         end
-        @app.call(env)
+        @env[CLIENT_KEY] = retrieve_client_from_session
+        status, headers, body = @app.call(env)
+        save_client_to_session(@env[CLIENT_KEY])
+        [status, headers, body]
       end
 
       private
@@ -170,7 +129,7 @@ module Databasedotcom
         state.query_values={} unless state.query_values
         state.query_values= state.query_values.merge({:endpoint => endpoint})
 
-        puts "endpoint: #{endpoint}\nmydomain: #{mydomain}\nstate: #{state.to_str}" if @debugging
+        puts "(1) endpoint: #{endpoint}\n(2) mydomain: #{mydomain}\n(3) state: #{state.to_str}" if @debugging
         
         #build params hash to be passed to ouath2 authorize redirect url
         auth_params = {
@@ -186,7 +145,10 @@ module Databasedotcom
         overrides = {}
         overrides[:display]   = request.params["display"]   unless !@display_override   || request.params["display"].nil?
         overrides[:immediate] = request.params["immediate"] unless !@immediate_override || request.params["immediate"].nil?
-        overrides[:prompt]    = request.params["prompt"]    unless !@prompt_override || request.params["prompt"].nil?
+        if @prompt_override
+          prompt = (self.class.param_repeated(request.url, :prompt) || []).join(" ")
+          overrides[:prompt] = prompt unless prompt.nil? || prompt.strip.empty?
+        end
         if @scope_override
           scope = (self.class.param_repeated(request.url, :scope) || []).join(" ")
           overrides[:scope] = scope unless scope.nil? || scope.strip.empty?
@@ -195,7 +157,7 @@ module Databasedotcom
         
         #do redirect
         redirect_url = client(mydomain || endpoint, keys[:key], keys[:secret]).auth_code.authorize_url(auth_params)
-        puts "redirecting to #{redirect_url}..." if @debugging
+        puts "(4) redirecting to #{redirect_url}..." if @debugging
         redirect redirect_url
       end
       
@@ -220,55 +182,85 @@ module Databasedotcom
         state_params = state.query_values.dup
         endpoint = state_params.delete("endpoint")
         keys = @endpoints[endpoint]
-        puts "endpoint #{endpoint}"
-        puts "keys #{keys}"
+        puts "(1) endpoint #{endpoint}" if @debugging
+        puts "(2) keys #{keys}" if @debugging
         state.query_values= state_params
         state = state.to_s
         state.sub!(/\?$/,"") unless state.nil?
-        puts "endpoint: #{endpoint}\nstate: #{state.to_str}\nretrieving token" if @debugging
+        puts "(3) endpoint: #{endpoint}\nstate: #{state.to_str}\nretrieving token" if @debugging
 
         #do callout to retrieve token
         access_token = client(endpoint, keys[:key], keys[:secret]).auth_code.get_token(code, 
           :redirect_uri => "#{full_host}#{@path_prefix}/callback")
-        puts "access_token immediatly post get token call #{access_token.inspect}" if @debugging
-        access_token.options[:mode]       = :query
-        access_token.options[:param_name] = :oauth_token
-        access_token.options[:endpoint]   = endpoint
-        access_token.client = nil
-        puts "access_token pre marshal-encrypt-cookiewrite #{access_token.inspect}" if @debugging
+        puts "(4) access_token immediatly post get token call #{access_token.inspect}" if @debugging
         
-        #populate session with serialized, encrypted token
-        #will be used later to materialize actual token and databasedotcom client handle
-        set_session_token(encrypt(access_token))
-        puts "session_token \n#{session_token}" if @debugging
+        client = self.class.client_from_oauth_token(access_token)
+        client.endpoint = endpoint
+        puts "(5) client from token: #{client.inspect}" if @debugging
+        save_client_to_session(client)
+        puts "(6) session_client \n#{session_client}" if @debugging
         redirect state.to_str
       end
 
-      def materialize_token_and_client_from_session_if_present
-        puts "==========================\nmaterialize intercept\n==========================\n" if @debugging
-        access_token = nil
-        puts "session_token \n#{session_token}" if @debugging
+      def save_client_to_session(client)
+        puts "==========================\nsave_client_to_session\n==========================\n" if @debugging
+        puts "(1) client as stored in session \n#{session_client}" if @debugging
+        puts "(2) client to save: #{client.inspect}" if @debugging
+        unless client.nil?
+          new_session_client = nil
+          unless client.logout_flag
+            # Zero out client id and secret; will re-populate later when client
+            #   is reloaded.  Should be safe to store client id and secret inside
+            #   encrypted client; however, out of an abundance of caution (and b/c
+            #   it just makes sense), client id and secret will never be written
+            #   to session but only stored via @endpoints variable server side.
+            client.client_id     = nil
+            client.client_secret = nil
+            client.version       = nil
+            client.debugging     = nil
+            client.last_seen     = Time.now
+            new_session_client = Gibberish::AES.new(@token_encryption_key).encrypt(Marshal.dump(client))
+          end
+          if new_session_client != session_client
+            session_client_put(new_session_client)
+          end
+        end
+        puts "(3) client as stored in session \n#{session_client}" if @debugging
+
+      end
+
+      def retrieve_client_from_session
+        puts "==========================\nretrieve_client_from_session\n==========================\n" if @debugging
+        puts "(1) session_client \n#{session_client}" if @debugging
+        client = nil
         begin
-          access_token = decrypt(session_token) unless session_token.nil?
+          client = Marshal.load(Gibberish::AES.new(@token_encryption_key).decrypt(session_client)) unless session_client.nil?
         rescue Exception => e
           puts "Exception FYI"
           self.class._log_exception(e)
         end
-        unless access_token.nil?
-          puts "access_token post cookieread-decrypt-marshal #{access_token.inspect}" if @debugging
-          instance_url = access_token.params["instance_url"]
-          endpoint = access_token.options[:endpoint]
-          keys = @endpoints[endpoint]
-          puts "endpoint #{endpoint}\nkeys #{keys}" if @debugging
-          access_token.client = client(instance_url, keys[:key], keys[:secret])
-          unless keys.nil?
-            @env[TOKEN_KEY]  = access_token #::OAuth2::AccessToken.from_hash(client(instance_url, keys[:key], keys[:secret]),access_token_hash.dup)
-            @env[CLIENT_KEY] = ::Databasedotcom::Client.from_token(@env[TOKEN_KEY],@api_version)
-            @env[CLIENT_KEY].debugging = @debugging
+        unless client.nil?
+          keys = @endpoints[client.endpoint]
+          if @debugging
+            puts "(2) client #{client.inspect}" 
+            puts "(3) client.endpoint #{client.endpoint}"
+            puts "(4) keys #{keys}"
           end
-          puts "materialized token: #{@env[TOKEN_KEY].inspect}" if @debugging
-          puts "materialized client: #{@env[CLIENT_KEY].inspect}" if @debugging
+          if keys.nil?
+            client = nil
+          else
+            client.client_id     = keys[:key]
+            client.client_secret = keys[:secret]
+            client.version       = @api_version
+            client.debugging     = @debugging
+          end
+          puts "(5) client #{client.inspect}" if @debugging
         end
+        client
+      end
+      
+      def request
+        @request ||= Rack::Request.new(@env)
       end
       
       def session
@@ -276,24 +268,12 @@ module Databasedotcom
         @env["rack.session"]
       end
 
-      def session_token
-        session[TOKEN_KEY]
+      def session_client
+        session[CLIENT_KEY]
       end
 
-      def set_session_token(value)
-        session[TOKEN_KEY] = value
-      end
-
-      def aes
-        Gibberish::AES.new(@token_encryption_key)
-      end
-
-      def encrypt(data)
-        aes.encrypt(Marshal.dump(data))
-      end
-
-      def decrypt(data)
-        Marshal.load(aes.decrypt(data))
+      def session_client_put(value)
+        session[CLIENT_KEY] = value
       end
 
       def on_path?(path)
@@ -304,14 +284,6 @@ module Databasedotcom
         request.path_info.downcase.sub(/\/$/,'')
       end
 
-      def query_string
-        request.query_string.empty? ? "" : "?#{request.query_string}"
-      end
-
-      def request
-        @request ||= Rack::Request.new(@env)
-      end
-      
       def full_host
         full_host = ENV['ORIGIN']
         if full_host.nil? || full_host.strip.empty?
@@ -328,7 +300,7 @@ module Databasedotcom
         ::OAuth2::Client.new(
            client_id, 
            client_secret, 
-           :site          => "https://#{Databasedotcom.parse_domain(site)}",
+           :site          => "https://#{self.class.parse_domain(site)}",
            :authorize_url => '/services/oauth2/authorize',
            :token_url     => '/services/oauth2/token'
         )
@@ -343,6 +315,36 @@ module Databasedotcom
       
       class << self
 
+        def parse_domain(url = nil)
+          unless url.nil?
+            url = "https://" + url if (url =~ /http[s]?:\/\//).nil?
+            begin
+              url = Addressable::URI.parse(url)
+            rescue Addressable::URI::InvalidURIError
+              url = nil
+            end
+            url = url.host unless url.nil?
+            url.strip! unless url.nil?
+          end
+          url = nil if url && url.strip.empty?
+          url
+        end
+
+        def client_from_oauth_token(token)
+          c = nil
+          unless token.nil?
+            c = Databasedotcom::Client.new
+            m = token["id"].match(/\/id\/([^\/]+)\/([^\/]+)$/)
+            c.org_id        = m[1] rescue nil
+            c.user_id       = m[2] rescue nil
+            c.instance_url   = token.params["instance_url"]
+            c.host           = parse_domain(c.instance_url)
+            c.oauth_token    = token.token
+            c.refresh_token  = token.refresh_token
+          end
+          c
+        end
+
         def _log_exception(exception)
           STDERR.puts "\n\n#{exception.class} (#{exception.message}):\n    " +
             exception.backtrace.join("\n    ") +
@@ -350,7 +352,7 @@ module Databasedotcom
         end
 
         def sanitize_mydomain(mydomain)
-            mydomain = Databasedotcom.parse_domain(mydomain)
+            mydomain = parse_domain(mydomain)
             mydomain = nil unless mydomain.nil? || !mydomain.strip.empty?
             mydomain = mydomain.split(/\.my\.salesforce\.com/).first + ".my.salesforce.com" unless mydomain.nil?
             mydomain
