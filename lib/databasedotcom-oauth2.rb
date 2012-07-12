@@ -49,6 +49,7 @@ module Databasedotcom
       def initialize(app, options = nil)
         @app = app       
         unless options.nil?
+          self.class.symbolize_keys!(options)
           @endpoints            = self.class.sanitize_endpoints(options[:endpoints])
           @token_encryption_key = options[:token_encryption_key]
           @path_prefix          = options[:path_prefix]
@@ -119,6 +120,7 @@ module Databasedotcom
         puts "==================\nauthorize phase\n==================\n" if @debugging
         #determine endpoint via param; but if blank, use default
         endpoint = request.params["endpoint"] #get endpoint from http param
+        endpoint = endpoint.to_sym unless endpoint.nil?
         keys     = @endpoints[endpoint]       #if endpoint not found, default will be used
         endpoint = @endpoints.invert[keys]    #re-lookup endpoint in case original param was bogus
         mydomain = self.class.sanitize_mydomain(request.params["mydomain"])
@@ -127,7 +129,7 @@ module Databasedotcom
         request.params["state"] ||= "/"
         state = Addressable::URI.parse(request.params["state"])
         state.query_values={} unless state.query_values
-        state.query_values= state.query_values.merge({:endpoint => endpoint})
+        state.query_values= state.query_values.merge({:endpoint => endpoint.to_s})
 
         puts "(1) endpoint: #{endpoint}\n(2) mydomain: #{mydomain}\n(3) state: #{state.to_str}" if @debugging
         
@@ -156,7 +158,7 @@ module Databasedotcom
         auth_params.merge!(overrides)
         
         #do redirect
-        redirect_url = client(mydomain || endpoint, keys[:key], keys[:secret]).auth_code.authorize_url(auth_params)
+        redirect_url = client(mydomain || endpoint.to_s, keys[:key], keys[:secret]).auth_code.authorize_url(auth_params)
         puts "(4) redirecting to #{redirect_url}..." if @debugging
         redirect redirect_url
       end
@@ -181,6 +183,7 @@ module Databasedotcom
         state.query_values= {} if state.query_values.nil?
         state_params = state.query_values.dup
         endpoint = state_params.delete("endpoint")
+        endpoint = endpoint.to_sym unless endpoint.nil?
         keys = @endpoints[endpoint]
         puts "(1) endpoint #{endpoint}" if @debugging
         puts "(2) keys #{keys}" if @debugging
@@ -190,7 +193,7 @@ module Databasedotcom
         puts "(3) endpoint: #{endpoint}\nstate: #{state.to_str}\nretrieving token" if @debugging
 
         #do callout to retrieve token
-        access_token = client(endpoint, keys[:key], keys[:secret]).auth_code.get_token(code, 
+        access_token = client(endpoint.to_s, keys[:key], keys[:secret]).auth_code.get_token(code, 
           :redirect_uri => "#{full_host}#{@path_prefix}/callback")
         puts "(4) access_token immediatly post get token call #{access_token.inspect}" if @debugging
         
@@ -315,7 +318,16 @@ module Databasedotcom
       
       class << self
 
+        def symbolize_keys!(hash={})
+          hash.keys.each do |key|
+            value = hash[(key.to_sym rescue key) || key] = hash.delete(key)
+            symbolize_keys!(value) if value.is_a?(Hash)
+          end
+          hash
+        end
+
         def parse_domain(url = nil)
+          url = url.to_s if url.is_a?(Symbol)
           unless url.nil?
             url = "https://" + url if (url =~ /http[s]?:\/\//).nil?
             begin

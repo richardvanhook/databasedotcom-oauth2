@@ -20,7 +20,7 @@ Specifically, databasedotcom-oauth2:
 Demos
 -------
 
-### Sinatra
+### Using Sinatra
 
 **<a href="https://db-oauth2-sinatra-basic.herokuapp.com" target="_blank">Simple example</a>**&nbsp;&nbsp;<a href="https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-basic" target="_blank">(view source on github)</a>
 
