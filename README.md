@@ -20,9 +20,9 @@ Specifically, databasedotcom-oauth2:
 Demos
 -------
 
-**<a href="https://db-oauth2-sinatra-basic.herokuapp.com" target="_blank">Simple example using Sinatra</a>**&nbsp;&nbsp;<a href="https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-basic" target="_blank">view source on github</a>
+**<a href="https://db-oauth2-sinatra-basic.herokuapp.com" target="_blank">Simple example using Sinatra</a>**&nbsp;&nbsp;<a href="https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-basic" target="_blank">(view source on github)</a>
 
-**<a href="https://db-oauth2-sinatra-jqm.herokuapp.com" target="_blank">In-depth configuration with JQuery Mobile</a>**&nbsp;&nbsp;<a href="https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-jqm" target="_blank">view source on github</a>
+**<a href="https://db-oauth2-sinatra-jqm.herokuapp.com" target="_blank">In-depth configuration with JQuery Mobile</a>**&nbsp;&nbsp;<a href="https://github.com/richardvanhook/databasedotcom-oauth2-sinatra-jqm" target="_blank">(view source on github)</a>
 
 Usage
 -------
