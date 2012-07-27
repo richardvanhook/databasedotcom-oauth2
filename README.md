@@ -32,7 +32,7 @@ Usage
 ### Minimal 
 
 ```ruby
-require "databasedotcom-oauth"
+require "databasedotcom-oauth2"
 use Databasedotcom::OAuth2::WebServerFlow, 
   :token_encryption_key => "replace me",
   :endpoints => {"login.salesforce.com" => {:key => "replace me", :secret => "replace me"}}
