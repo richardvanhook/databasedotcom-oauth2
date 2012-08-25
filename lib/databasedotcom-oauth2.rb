@@ -31,17 +31,17 @@ module Databasedotcom
         env[CLIENT_KEY]
       end
 
-    	def unauthenticated?
-    	  client.nil?
-  	  end
+      def unauthenticated?
+        client.nil?
+      end
 
-    	def authenticated?
-    	  !unauthenticated?
-    	end
-    	
-    	def me
-    	  @me ||= ::Hashie::Mash.new(Databasedotcom::Chatter::User.find(client, "me").raw_hash)
-  	  end
+      def authenticated?
+        !unauthenticated?
+      end
+        
+      def me
+        @me ||= ::Hashie::Mash.new(Databasedotcom::Chatter::User.find(client, "me").raw_hash)
+      end
     end
 
     class WebServerFlow
@@ -66,20 +66,9 @@ module Databasedotcom
           @debugging            = options[:debugging]          || false
         end
 
-        fail "\n\ndatabasedotcom-oauth2 initialization error!  :endpoints parameter " \
-          + "is invalid.  Do something like this:\n\nuse Databasedotcom::OAuth2::Web" \
-          + "ServerFlow, :endpoints => {\"login.salesforce.com\" => { :key => CLIENT" \
-          + "_ID_FROM_DATABASEDOTCOM, :secret => CLIENT_SECRET_FROM_DATABASEDOTCOM }" \
-          + "}\n\n"                                                                   \
-          if !@endpoints.is_a?(Hash) || @endpoints.empty?
-            
-        fail "\n\ndatabasedotcom-oauth2 initialization error!  :token_encryption_key " \
-          + "is invalid.  Do something like this:\n\nuse Databasedotcom::OAuth2::WebS" \
-          + "erverFlow, :token_encryption_key => YOUR_VERY_LONG_VERY_RANDOM_SECRET_KE" \
-          + "Y_HERE\n\nTo generate a sufficiently long random key, use following comm" \
-          + "and:\n\n$ ruby -ropenssl -rbase64 -e \"puts Base64.strict_encode64(OpenS" \
-          + "SL::Random.random_bytes(16).to_str)\"\n\n"                                \
-          if @token_encryption_key.nil? || @token_encryption_key.size < 16
+        
+        fail ENDPOINTS_MISSING_MESSAGE if !@endpoints.is_a?(Hash) || @endpoints.empty?
+        fail TOKEN_MISSING_MESSAGE if @token_encryption_key.nil? || @token_encryption_key.size < 16    
             
         @path_prefix = "/auth/salesforce" unless @path_prefix.is_a?(String) && !@path_prefix.strip.empty?
         @on_failure = nil unless @on_failure.is_a?(Proc)
@@ -117,7 +106,12 @@ module Databasedotcom
       end
 
       def authorize_call
-        puts "==================\nauthorize phase\n==================\n" if @debugging
+        debug <<-message
+          ==================
+          authorize phase
+          ==================
+        message
+
         #determine endpoint via param; but if blank, use default
         endpoint = request.params["endpoint"] #get endpoint from http param
         endpoint = endpoint.to_sym unless endpoint.nil?
@@ -131,8 +125,6 @@ module Databasedotcom
         state.query_values={} unless state.query_values
         state.query_values= state.query_values.merge({:endpoint => endpoint.to_s})
 
-        puts "(1) endpoint: #{endpoint}\n(2) mydomain: #{mydomain}\n(3) state: #{state.to_str}" if @debugging
-        
         #build params hash to be passed to ouath2 authorize redirect url
         auth_params = {
           :redirect_uri  => "#{full_host}#{@path_prefix}/callback",
@@ -159,7 +151,12 @@ module Databasedotcom
         
         #do redirect
         redirect_url = client(mydomain || endpoint.to_s, keys[:key], keys[:secret]).auth_code.authorize_url(auth_params)
-        puts "(4) redirecting to #{redirect_url}..." if @debugging
+        debug <<-message
+          (1) endpoint: #{endpoint}
+          (2) mydomain: #{mydomain}
+          (3) state:    #{state.to_str}
+          (4) redirecting to #{redirect_url}...
+        message
         redirect redirect_url
       end
       
@@ -168,7 +165,11 @@ module Databasedotcom
       end
 
       def callback_call
-        puts "==================\ncallback phase\n==================\n" if @debugging
+        debug <<-message
+          ==================
+          callback phase
+          ==================
+        message
         #check for error
         callback_error         = request.params["error"]         
         callback_error_details = request.params["error_description"]
@@ -185,30 +186,42 @@ module Databasedotcom
         endpoint = state_params.delete("endpoint")
         endpoint = endpoint.to_sym unless endpoint.nil?
         keys = @endpoints[endpoint]
-        puts "(1) endpoint #{endpoint}" if @debugging
-        puts "(2) keys #{keys}" if @debugging
+        debug <<-message
+          (1) endpoint #{endpoint}
+          (2) keys #{keys}
+        message
         state.query_values= state_params
         state = state.to_s
         state.sub!(/\?$/,"") unless state.nil?
-        puts "(3) endpoint: #{endpoint}\nstate: #{state.to_str}\nretrieving token" if @debugging
+        debug <<-message
+          (3) endpoint: #{endpoint}
+          (4) state: #{state.to_str}
+          (5) retrieving token
+        message
 
         #do callout to retrieve token
         access_token = client(endpoint.to_s, keys[:key], keys[:secret]).auth_code.get_token(code, 
           :redirect_uri => "#{full_host}#{@path_prefix}/callback")
-        puts "(4) access_token immediatly post get token call #{access_token.inspect}" if @debugging
         
         client = self.class.client_from_oauth_token(access_token)
         client.endpoint = endpoint
-        puts "(5) client from token: #{client.inspect}" if @debugging
         save_client_to_session(client)
-        puts "(6) session_client \n#{session_client}" if @debugging
+        debug <<-message
+          (4) access_token immediatly post get token call #{access_token.inspect}
+          (5) client from token: #{client.inspect}
+          (6) session_client \n#{session_client}
+        message
         redirect state.to_str
       end
 
       def save_client_to_session(client)
-        puts "==========================\nsave_client_to_session\n==========================\n" if @debugging
-        puts "(1) client as stored in session \n#{session_client}" if @debugging
-        puts "(2) client to save: #{client.inspect}" if @debugging
+        debug <<-message
+          ==========================
+          save_client_to_session
+          ==========================
+          (1) client as stored in session: #{session_client}
+          (2) client to save: #{client.inspect}
+        message
         unless client.nil?
           new_session_client = nil
           unless client.logout_flag
@@ -228,26 +241,34 @@ module Databasedotcom
             session_client_put(new_session_client)
           end
         end
-        puts "(3) client as stored in session \n#{session_client}" if @debugging
+        debug <<-message
+          (3) client as stored in session #{session_client}
+        message
 
       end
 
       def retrieve_client_from_session
-        puts "==========================\nretrieve_client_from_session\n==========================\n" if @debugging
-        puts "(1) session_client \n#{session_client}" if @debugging
+        debug <<-message
+          ==========================
+          retrieve_client_from_session
+          ==========================
+          (1) session_client 
+          #{session_client}
+        message
         client = nil
         begin
           client = Marshal.load(Gibberish::AES.new(@token_encryption_key).decrypt(session_client)) unless session_client.nil?
         rescue Exception => e
-          puts "Exception FYI"
           self.class._log_exception(e)
         end
         unless client.nil?
           keys = @endpoints[client.endpoint]
+          debug <<-message
+            (2) client #{client.inspect}
+            (3) client.endpoint #{client.endpoint}
+            (4) keys #{keys}
+          message
           if @debugging
-            puts "(2) client #{client.inspect}" 
-            puts "(3) client.endpoint #{client.endpoint}"
-            puts "(4) keys #{keys}"
           end
           if keys.nil?
             client = nil
@@ -257,7 +278,9 @@ module Databasedotcom
             client.version       = @api_version
             client.debugging     = @debugging
           end
-          puts "(5) client #{client.inspect}" if @debugging
+          debug <<-message
+            (5) client #{client.inspect}
+          message
         end
         client
       end
@@ -315,7 +338,11 @@ module Databasedotcom
         r.redirect(uri)
         r.finish
       end
-      
+
+      def debug(message)
+        puts message.gsub(/^ +/,"") if @debugging && !message.nil?
+      end
+            
       class << self
 
         def symbolize_keys!(hash={})
@@ -358,9 +385,11 @@ module Databasedotcom
         end
 
         def _log_exception(exception)
-          STDERR.puts "\n\n#{exception.class} (#{exception.message}):\n    " +
+          STDERR.puts <<-message
+            \n\n#{exception.class} (#{exception.message}):\n    " +
             exception.backtrace.join("\n    ") +
-            "\n\n"
+            "\n\n
+          message
         end
 
         def sanitize_mydomain(mydomain)
@@ -403,6 +432,37 @@ module Databasedotcom
         end
 
       end
+
+      ENDPOINTS_MISSING_MESSAGE = <<-message
+
+
+databasedotcom-oauth2 initialization error!  :endpoints parameter is invalid.  Do something like this:
+
+use Databasedotcom::OAuth2::WebServerFlow, 
+  :endpoints => {
+    "login.salesforce.com" => { 
+      :key    => CLIENT_ID_FROM_DATABASEDOTCOM, 
+      :secret => CLIENT_SECRET_FROM_DATABASEDOTCOM 
+    }
+  }
+
+      message
+
+      TOKEN_MISSING_MESSAGE = <<-message
+
+
+databasedotcom-oauth2 initialization error!  :token_encryption_key is invalid.  Do something like this:
+
+use Databasedotcom::OAuth2::WebServerFlow, 
+  :token_encryption_key => YOUR_VERY_LONG_VERY_RANDOM_SECRET_KEY_HERE
+
+To generate a sufficiently long random key, use following command:
+
+$ ruby -ropenssl -rbase64 -e "puts Base64.strict_encode64(OpenSSL::Random.random_bytes(16).to_str)"
+
+
+      message
+
     end
     
   end
